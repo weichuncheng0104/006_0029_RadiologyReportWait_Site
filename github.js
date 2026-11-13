@@ -1,0 +1,67 @@
+// GitHub Contents API client for reading/writing data.json.
+import { encodeBase64Utf8, decodeBase64Utf8 } from './core.js';
+
+export const REPO = {
+  owner: 'weichuncheng0104',
+  repo: '006_0029_RadiologyReportWait_Site',
+  path: 'data.json',
+  branch: 'main',
+};
+
+const API_URL = `https://api.github.com/repos/${REPO.owner}/${REPO.repo}/contents/${REPO.path}`;
+
+export class ApiError extends Error {
+  constructor(status) {
+    super(describeApiError(status));
+    this.status = status;
+  }
+}
+
+export function describeApiError(status) {
+  if (status === 0) return '無法連線 GitHub，請檢查網路';
+  if (status === 401) return 'Token 無效或已過期，請重新輸入';
+  if (status === 403 || status === 404) return 'Token 權限不足（需本 repo 的 Contents 讀寫權限）';
+  if (status === 409) return '資料已被更新，請重新載入後再存';
+  if (status === 422) return 'GitHub 拒絕此次儲存（資料驗證失敗）';
+  return `GitHub 回應錯誤（HTTP ${status}）`;
+}
+
+function headers(token) {
+  return {
+    Authorization: `Bearer ${token}`,
+    Accept: 'application/vnd.github+json',
+    'X-GitHub-Api-Version': '2022-11-28',
+  };
+}
+
+async function request(fetchImpl, url, init) {
+  let res;
+  try {
+    res = await fetchImpl(url, init);
+  } catch {
+    throw new ApiError(0);
+  }
+  if (!res.ok) throw new ApiError(res.status);
+  return res.json();
+}
+
+export async function getFile(token, fetchImpl = fetch) {
+  const body = await request(fetchImpl, `${API_URL}?ref=${REPO.branch}`, {
+    headers: headers(token), cache: 'no-store',
+  });
+  return { data: JSON.parse(decodeBase64Utf8(body.content)), sha: body.sha };
+}
+
+export async function putFile(token, data, sha, fetchImpl = fetch) {
+  const body = await request(fetchImpl, API_URL, {
+    method: 'PUT',
+    headers: { ...headers(token), 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      message: `Update wait times ${data.lastUpdate ?? ''}`.trim(),
+      content: encodeBase64Utf8(JSON.stringify(data, null, 2) + '\n'),
+      sha,
+      branch: REPO.branch,
+    }),
+  });
+  return body.content.sha;
+}
