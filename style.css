@@ -33,7 +33,7 @@ main { max-width: 720px; margin: 0 auto; padding: 16px; }
 /* Public board: centered title with the admin button kept at the top right. */
 .topbar.centered { display: grid; grid-template-columns: 1fr auto 1fr; }
 .topbar.centered .brand { grid-column: 2; display: flex; align-items: center; justify-content: center; gap: 12px; }
-.topbar.centered .brand img { width: 56px; height: 56px; flex-shrink: 0; background: #fff; border-radius: 50%; padding: 4px; }
+.topbar.centered .brand img { width: 32px; height: 32px; flex-shrink: 0; box-sizing: content-box; background: #fff; border-radius: 50%; padding: 4px; }
 .topbar.centered h1 { text-align: center; line-height: 1.35; }
 .topbar.centered h1 small { font-size: 0.75em; font-weight: 400; margin-left: 4px; white-space: nowrap; }
 .topbar.centered .btn { grid-column: 3; justify-self: end; }
@@ -43,7 +43,6 @@ main { max-width: 720px; margin: 0 auto; padding: 16px; }
 @media (max-width: 480px) {
   .topbar.centered { grid-template-columns: 1fr; }
   .topbar.centered .brand, .topbar.centered .btn { grid-column: 1; }
-  .topbar.centered .brand img { width: 44px; height: 44px; }
   .topbar.centered h1 small { display: block; margin-left: 0; }
   .topbar.centered .btn { grid-row: 1; }
   #board th, #board td { font-size: 1.15rem; padding: 12px; }
