@@ -9,9 +9,6 @@ export const WEEK_OPTIONS = [
 
 const INVALID_STYLE = { label: '—', bg: '#d0d0d0', fg: '#333' };
 
-// SHA-256 of the admin password. The plaintext must never be committed here (public repo).
-export const PASSWORD_SHA256 = '5e03aa760425d580d53e9a82d579c393b1ab402ddb25680b341ef6b1c363d5aa';
-
 export function weekStyle(weeks) {
   const opt = WEEK_OPTIONS.find((o) => o.value === weeks);
   return opt ? { label: opt.label, bg: opt.bg, fg: opt.fg } : { ...INVALID_STYLE };
@@ -58,7 +55,37 @@ export function decodeBase64Utf8(b64) {
   return new TextDecoder().decode(Uint8Array.from(bin, (c) => c.charCodeAt(0)));
 }
 
-export async function sha256Hex(s) {
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
-  return Array.from(new Uint8Array(buf), (b) => b.toString(16).padStart(2, '0')).join('');
+// --- Password-encrypted token (PBKDF2-SHA256 -> AES-GCM). The blob is public; only the password unlocks it.
+
+function bytesToB64(bytes) {
+  let bin = '';
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return btoa(bin);
+}
+
+function b64ToBytes(b64) {
+  return Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+}
+
+async function deriveKey(password, salt, iterations) {
+  const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    { name: 'PBKDF2', hash: 'SHA-256', salt, iterations },
+    base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt'],
+  );
+}
+
+export async function encryptToken(token, password, iterations = 600000) {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const key = await deriveKey(password, salt, iterations);
+  const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode(token));
+  return { v: 1, kdf: 'PBKDF2-SHA256', iter: iterations, salt: bytesToB64(salt), iv: bytesToB64(iv), ct: bytesToB64(new Uint8Array(ct)) };
+}
+
+export async function decryptToken(blob, password) {
+  if (!blob || blob.v !== 1 || !Number.isInteger(blob.iter)) throw new Error('bad token blob');
+  const key = await deriveKey(password, b64ToBytes(blob.salt), blob.iter);
+  const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64ToBytes(blob.iv) }, key, b64ToBytes(blob.ct));
+  return new TextDecoder().decode(pt);
 }

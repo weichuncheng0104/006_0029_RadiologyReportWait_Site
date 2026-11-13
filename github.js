@@ -19,8 +19,8 @@ export class ApiError extends Error {
 
 export function describeApiError(status) {
   if (status === 0) return '無法連線 GitHub，請檢查網路';
-  if (status === 401) return 'Token 無效或已過期，請重新輸入';
-  if (status === 403 || status === 404) return 'Token 權限不足（需本 repo 的 Contents 讀寫權限）';
+  if (status === 401) return 'Token 無效或已過期';
+  if (status === 403 || status === 404) return 'Token 權限不足（需本 repo 的 Contents 讀寫權限）或檔案不存在';
   if (status === 409) return '資料已被更新，請重新載入後再存';
   if (status === 422) return 'GitHub 拒絕此次儲存（資料驗證失敗）';
   return `GitHub 回應錯誤（HTTP ${status}）`;

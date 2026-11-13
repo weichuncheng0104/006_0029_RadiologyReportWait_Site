@@ -2,7 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   WEEK_OPTIONS, weekStyle, validateData, formatTaipei, buildDataUrl,
-  encodeBase64Utf8, decodeBase64Utf8, sha256Hex, PASSWORD_SHA256, formatLastUpdate,
+  encodeBase64Utf8, decodeBase64Utf8, formatLastUpdate,
+  encryptToken, decryptToken,
 } from '../core.js';
 
 test('weekStyle maps weeks to label and colors', () => {
@@ -46,10 +47,33 @@ test('base64 utf-8 round trip and newline tolerance', () => {
   assert.equal(decodeBase64Utf8(encodeBase64Utf8('x').replace(/(.{2})/, '$1\n')), 'x');
 });
 
-test('sha256Hex matches standard vector; password hash is well formed', async () => {
-  assert.equal(await sha256Hex('abc'), 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
-  assert.match(PASSWORD_SHA256, /^[0-9a-f]{64}$/);
-  assert.notEqual(await sha256Hex('wrong'), PASSWORD_SHA256);
+test('encryptToken/decryptToken round trip with password', async () => {
+  const blob = await encryptToken('FAKE_TOKEN_X', 'pw', 1000);
+  assert.equal(blob.v, 1);
+  assert.equal(blob.kdf, 'PBKDF2-SHA256');
+  assert.equal(blob.iter, 1000);
+  assert.ok(!JSON.stringify(blob).includes('FAKE_TOKEN_X'));
+  assert.equal(await decryptToken(blob, 'pw'), 'FAKE_TOKEN_X');
+});
+
+test('decryptToken rejects wrong password and tampered data', async () => {
+  const blob = await encryptToken('FAKE_TOKEN_X', 'pw', 1000);
+  await assert.rejects(decryptToken(blob, 'wrong'));
+  await assert.rejects(decryptToken({ ...blob, ct: blob.ct.replace(/^./, (c) => (c === 'A' ? 'B' : 'A')) }, 'pw'));
+  await assert.rejects(decryptToken(null, 'pw'));
+});
+
+test('encryptToken uses fresh salt and iv each time', async () => {
+  const a = await encryptToken('t', 'pw', 1000);
+  const b = await encryptToken('t', 'pw', 1000);
+  assert.notEqual(a.salt, b.salt);
+  assert.notEqual(a.iv, b.iv);
+  assert.notEqual(a.ct, b.ct);
+});
+
+test('core.js no longer exports a password hash', async () => {
+  const mod = await import('../core.js');
+  assert.equal('PASSWORD_SHA256' in mod, false);
 });
 
 test('formatLastUpdate falls back to dash for null or unparseable values', () => {

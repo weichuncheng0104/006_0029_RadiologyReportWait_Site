@@ -1,28 +1,24 @@
-// Admin page: password gate, token handling, edit weeks, save via GitHub Contents API.
-import { WEEK_OPTIONS, weekStyle, validateData, formatTaipei, formatLastUpdate, sha256Hex, PASSWORD_SHA256 } from './core.js';
+// Admin page: password unlocks the encrypted token, edit weeks, save via GitHub Contents API.
+import { WEEK_OPTIONS, weekStyle, validateData, formatTaipei, formatLastUpdate, decryptToken } from './core.js';
 import { getFile, putFile } from './github.js';
 
 const $ = (id) => document.getElementById(id);
-const AUTH_KEY = 'rrw_auth';
-const TOKEN_KEY = 'rrw_token';
+const TOKEN_FAILURE = 'Token 已失效或權限不足，請管理者更新';
 
-const store = {
-  get(s, k) { try { return s().getItem(k); } catch { return null; } },
-  set(s, k, v) { try { s().setItem(k, v); } catch { /* storage unavailable */ } },
-  del(s, k) { try { s().removeItem(k); } catch { /* storage unavailable */ } },
-};
-const LOCAL = () => window.localStorage;
-const SESSION = () => window.sessionStorage;
-
+let token = null;   // decrypted PAT, memory only
 let current = null; // { data, sha }
 
 function show(id) {
-  for (const s of ['login', 'token-panel', 'editor']) $(s).hidden = s !== id;
+  for (const s of ['login', 'editor']) $(s).hidden = s !== id;
 }
 
 function setMsg(id, text, kind) {
   $(id).textContent = text;
   $(id).className = `msg ${kind ?? ''}`;
+}
+
+function errorText(e) {
+  return [401, 403, 404].includes(e.status) ? TOKEN_FAILURE : e.message;
 }
 
 function isValidWeeks(w) {
@@ -58,14 +54,7 @@ function renderEditor() {
   show('editor');
 }
 
-function toTokenPanel(message) {
-  setMsg('token-msg', message ?? '', 'err');
-  show('token-panel');
-}
-
 async function loadData() {
-  const token = store.get(LOCAL, TOKEN_KEY);
-  if (!token) { toTokenPanel(); return; }
   try {
     const r = await getFile(token);
     const v = validateData(r.data);
@@ -74,14 +63,12 @@ async function loadData() {
     setMsg('save-msg', '');
     renderEditor();
   } catch (e) {
-    if (e.status === 401) store.del(LOCAL, TOKEN_KEY);
-    toTokenPanel(e.message);
+    if (current) setMsg('save-msg', errorText(e), 'err');
+    else setMsg('login-msg', errorText(e), 'err');
   }
 }
 
 async function save() {
-  const token = store.get(LOCAL, TOKEN_KEY);
-  if (!token) { toTokenPanel(); return; }
   const sels = [...document.querySelectorAll('#rows select')];
   if (sels.some((s) => s.value === '')) { setMsg('save-msg', '每一項都要選擇週數', 'err'); return; }
   const weeksById = Object.fromEntries(sels.map((s) => [s.dataset.id, Number(s.value)]));
@@ -98,40 +85,47 @@ async function save() {
     $('last-update').textContent = formatTaipei(new Date(next.lastUpdate), false);
     setMsg('save-msg', '已儲存，約 1 分鐘後前台更新', 'ok');
   } catch (e) {
-    if (e.status === 401) {
-      store.del(LOCAL, TOKEN_KEY);
-      toTokenPanel(e.message);
-    } else {
-      setMsg('save-msg', e.message, 'err');
-    }
+    setMsg('save-msg', errorText(e), 'err');
   } finally {
     $('save-btn').disabled = false;
   }
 }
 
 async function login() {
-  if ((await sha256Hex($('pw').value)) !== PASSWORD_SHA256) {
-    setMsg('login-msg', '密碼錯誤', 'err');
-    return;
+  $('login-btn').disabled = true;
+  setMsg('login-msg', '驗證中…');
+  try {
+    let blob;
+    try {
+      const res = await fetch(`./token.enc.json?t=${Date.now()}`, { cache: 'no-store' });
+      if (!res.ok) throw new Error();
+      blob = await res.json();
+    } catch {
+      setMsg('login-msg', '無法載入金鑰檔，請稍後再試', 'err');
+      return;
+    }
+    try {
+      token = await decryptToken(blob, $('pw').value);
+    } catch {
+      setMsg('login-msg', '密碼錯誤', 'err');
+      return;
+    }
+    $('pw').value = '';
+    setMsg('login-msg', '');
+    await loadData();
+  } finally {
+    $('login-btn').disabled = false;
   }
-  store.set(SESSION, AUTH_KEY, '1');
-  $('pw').value = '';
-  setMsg('login-msg', '');
-  loadData();
 }
 
 $('login-btn').addEventListener('click', login);
-$('pw').addEventListener('keydown', (e) => { if (e.key === 'Enter') login(); });
-$('token-btn').addEventListener('click', () => {
-  const t = $('token').value.trim();
-  if (!t) return;
-  store.set(LOCAL, TOKEN_KEY, t);
-  $('token').value = '';
-  setMsg('token-msg', '');
-  loadData();
-});
+$('pw').addEventListener('keydown', (e) => { if (e.key === 'Enter' && !$('login-btn').disabled) login(); });
 $('save-btn').addEventListener('click', save);
 $('reload-btn').addEventListener('click', loadData);
-$('change-token-btn').addEventListener('click', () => { store.del(LOCAL, TOKEN_KEY); toTokenPanel(); });
 
-if (store.get(SESSION, AUTH_KEY) === '1') loadData(); else show('login');
+// Clean up credentials stored by the earlier token-in-browser version; never read or reuse them.
+for (const [s, k] of [[() => window.localStorage, 'rrw_token'], [() => window.sessionStorage, 'rrw_auth']]) {
+  try { s().removeItem(k); } catch { /* storage unavailable */ }
+}
+
+show('login');
