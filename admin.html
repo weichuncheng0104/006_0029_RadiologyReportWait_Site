@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>後台｜放射科報告預計等候時間公告表</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1>後台｜放射科報告預計等候時間</h1>
+    <a class="btn" href="index.html">回前台</a>
+  </header>
+  <main>
+    <section class="panel" id="login">
+      <label for="pw">請輸入密碼</label>
+      <input id="pw" type="password" autocomplete="current-password">
+      <button class="btn primary" id="login-btn" type="button">進入</button>
+      <p class="msg err" id="login-msg"></p>
+    </section>
+
+    <section class="panel" id="token-panel" hidden>
+      <label for="token">請貼上 GitHub Token（只需在此瀏覽器輸入一次）</label>
+      <input id="token" type="password" autocomplete="off">
+      <button class="btn primary" id="token-btn" type="button">確定</button>
+      <p><a href="https://github.com/weichuncheng0104/006_0029_RadiologyReportWait_Site#readme" target="_blank" rel="noopener">如何取得 Token</a></p>
+      <p class="msg err" id="token-msg"></p>
+    </section>
+
+    <section id="editor" hidden>
+      <p class="meta">LastUpdate: <span id="last-update">—</span></p>
+      <table class="board">
+        <thead><tr><th>檢查類別</th><th>預計等候時間</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+      <div class="actions">
+        <button class="btn primary" id="save-btn" type="button">儲存</button>
+        <button class="btn secondary" id="reload-btn" type="button">重新載入</button>
+        <button class="btn secondary" id="change-token-btn" type="button">更換 Token</button>
+      </div>
+      <p class="msg" id="save-msg"></p>
+    </section>
+  </main>
+  <script type="module" src="admin.js"></script>
+</body>
+</html>

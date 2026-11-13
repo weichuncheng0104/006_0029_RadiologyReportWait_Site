@@ -29,3 +29,4 @@ main { max-width: 720px; margin: 0 auto; padding: 16px; }
 .msg.ok { color: #1e7b34; }
 .msg.err { color: #9b1c1c; }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.btn.secondary { color: #1f3a5f; }
