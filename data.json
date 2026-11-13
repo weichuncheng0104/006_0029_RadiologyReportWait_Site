@@ -1,0 +1,16 @@
+{
+  "lastUpdate": null,
+  "items": [
+    { "id": "xray", "name": "X 光", "weeks": 1 },
+    { "id": "ct", "name": "CT", "weeks": 1 },
+    { "id": "mri", "name": "MRI", "weeks": 1 },
+    { "id": "mammo", "name": "乳房攝影", "weeks": 1 },
+    { "id": "bmd", "name": "骨密度", "weeks": 1 },
+    { "id": "abd_us", "name": "腹部超音波", "weeks": 1 },
+    { "id": "breast_us", "name": "乳房超音波", "weeks": 1 },
+    { "id": "thyroid_us", "name": "甲狀腺／頸部超音波", "weeks": 1 },
+    { "id": "carotid_us", "name": "頸動脈超音波", "weeks": 1 },
+    { "id": "vascular_us", "name": "四肢血管超音波", "weeks": 1 },
+    { "id": "other_us", "name": "其他超音波", "weeks": 1 }
+  ]
+}

@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>放射科報告預計等候時間公告表</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1>放射科報告預計等候時間公告表</h1>
+    <a class="btn" href="admin.html">後台</a>
+  </header>
+  <main>
+    <p class="meta">
+      <span>現在時間：<span id="now">—</span></span>
+      <span>LastUpdate: <span id="last-update">—</span></span>
+    </p>
+    <p id="error" class="error" hidden>資料讀取失敗，請稍後再試</p>
+    <table class="board" id="board">
+      <thead><tr><th>檢查類別</th><th>預計等候時間</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <ul class="legend" id="legend"></ul>
+  </main>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
