@@ -1,5 +1,5 @@
 // Public board: clock, data.json fetch, table rendering.
-import { WEEK_OPTIONS, weekStyle, validateData, formatTaipei, buildDataUrl } from './core.js';
+import { WEEK_OPTIONS, weekStyle, validateData, formatTaipei, formatLastUpdate, buildDataUrl } from './core.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -40,7 +40,7 @@ async function load() {
     const v = validateData(await res.json());
     if (!v.ok) throw new Error(v.error);
     renderRows(v.data.items);
-    $('last-update').textContent = v.data.lastUpdate ? formatTaipei(new Date(v.data.lastUpdate), false) : '—';
+    $('last-update').textContent = formatLastUpdate(v.data.lastUpdate);
   } catch {
     $('error').hidden = false;
     $('board').hidden = true;

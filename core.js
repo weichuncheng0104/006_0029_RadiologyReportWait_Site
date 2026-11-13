@@ -38,6 +38,11 @@ export function formatTaipei(date, withSeconds) {
   return withSeconds ? `${base}:${p.second}` : base;
 }
 
+export function formatLastUpdate(iso) {
+  const d = iso ? new Date(iso) : null;
+  return d && !Number.isNaN(d.getTime()) ? formatTaipei(d, false) : '—';
+}
+
 export function buildDataUrl(base, now) {
   return `${base}data.json?t=${now}`;
 }

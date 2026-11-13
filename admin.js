@@ -1,5 +1,5 @@
 // Admin page: password gate, token handling, edit weeks, save via GitHub Contents API.
-import { WEEK_OPTIONS, weekStyle, validateData, formatTaipei, sha256Hex, PASSWORD_SHA256 } from './core.js';
+import { WEEK_OPTIONS, weekStyle, validateData, formatTaipei, formatLastUpdate, sha256Hex, PASSWORD_SHA256 } from './core.js';
 import { getFile, putFile } from './github.js';
 
 const $ = (id) => document.getElementById(id);
@@ -37,7 +37,7 @@ function paint(sel) {
 
 function renderEditor() {
   const { data } = current;
-  $('last-update').textContent = data.lastUpdate ? formatTaipei(new Date(data.lastUpdate), false) : '—';
+  $('last-update').textContent = formatLastUpdate(data.lastUpdate);
   $('rows').replaceChildren(...data.items.map((it) => {
     const tr = document.createElement('tr');
     tr.className = 'admin-row';

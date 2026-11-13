@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   WEEK_OPTIONS, weekStyle, validateData, formatTaipei, buildDataUrl,
-  encodeBase64Utf8, decodeBase64Utf8, sha256Hex, PASSWORD_SHA256,
+  encodeBase64Utf8, decodeBase64Utf8, sha256Hex, PASSWORD_SHA256, formatLastUpdate,
 } from '../core.js';
 
 test('weekStyle maps weeks to label and colors', () => {
@@ -50,4 +50,10 @@ test('sha256Hex matches standard vector; password hash is well formed', async ()
   assert.equal(await sha256Hex('abc'), 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
   assert.match(PASSWORD_SHA256, /^[0-9a-f]{64}$/);
   assert.notEqual(await sha256Hex('wrong'), PASSWORD_SHA256);
+});
+
+test('formatLastUpdate falls back to dash for null or unparseable values', () => {
+  assert.equal(formatLastUpdate(null), '—');
+  assert.equal(formatLastUpdate('not a date'), '—');
+  assert.equal(formatLastUpdate('2026-11-13T16:30:05Z'), '2026-11-14 00:30');
 });
