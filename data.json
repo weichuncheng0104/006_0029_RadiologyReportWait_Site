@@ -1,10 +1,10 @@
 {
-  "lastUpdate": "2026-11-13T14:07:31.216Z",
+  "lastUpdate": "2026-11-13T14:33:50.543Z",
   "items": [
     {
       "id": "xray",
       "name": "X 光",
-      "weeks": 2
+      "weeks": 3
     },
     {
       "id": "ct",
@@ -44,7 +44,7 @@
     {
       "id": "carotid_us",
       "name": "頸動脈超音波",
-      "weeks": 1
+      "weeks": 2
     },
     {
       "id": "vascular_us",
