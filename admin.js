@@ -3,16 +3,24 @@ import {
   WEEK_OPTIONS, weekStyle, validateData, formatTaipei, formatLastUpdate, decryptToken,
   parseRisText, computeActual, actualStyle, taipeiDateString, buildNextData,
   taipeiDateTimeString, historyColumns, buildHistoryRow, upsertHistory,
-} from './core.js';
-import { getFile, putFile, getText, putText } from './github.js';
+  expectedColumns, buildExpectedRow, appendCsvRow,
+} from './core.js?v=20261114c';
+import { getFile, putFile, getText, putText } from './github.js?v=20261114c';
 
 const $ = (id) => document.getElementById(id);
 const HISTORY_PATH = 'history.csv';
+const EXPECTED_PATH = 'expected_history.csv';
 const TOKEN_FAILURE = 'Token 已失效或權限不足，請管理者更新';
 
 let token = null;   // decrypted PAT, memory only
 let current = null; // { data, sha }
 let ris = null;     // { records, result, captureDate, skipped } from the uploaded list; memory only
+let saving = false; // true for the whole save sequence (history -> data.json -> expected log)
+
+// Re-enable Save only when no save sequence is in flight.
+function enableSave() {
+  $('save-btn').disabled = saving;
+}
 let risGen = 0;     // selection counter: only the latest file selection may set `ris`
 
 function show(id) {
@@ -102,7 +110,7 @@ function clearRis(msg) {
   $('ris-file').value = '';
   $('ris-date').value = '';
   setMsg('ris-msg', msg ?? '');
-  $('save-btn').disabled = false;
+  enableSave();
 }
 
 async function onRisFile() {
@@ -110,7 +118,7 @@ async function onRisFile() {
   const file = $('ris-file').files[0];
   ris = null;
   $('ris-result').hidden = true;
-  if (!file) { setMsg('ris-msg', ''); $('save-btn').disabled = false; return; }
+  if (!file) { setMsg('ris-msg', ''); enableSave(); return; }
   $('save-btn').disabled = true; // no save while parsing
   try {
     const text = await file.text();
@@ -128,7 +136,7 @@ async function onRisFile() {
   } catch (e) {
     if (gen === risGen) setMsg('ris-msg', `解析失敗：${e.message}`, 'err');
   } finally {
-    if (gen === risGen) $('save-btn').disabled = false;
+    if (gen === risGen) enableSave();
   }
 }
 
@@ -162,6 +170,7 @@ async function loadData() {
 }
 
 async function save() {
+  if (saving) return;
   const sels = [...document.querySelectorAll('#rows select')];
   if (sels.some((s) => s.value === '')) { setMsg('save-msg', '每一項都要選擇週數', 'err'); return; }
   const weeksById = Object.fromEntries(sels.map((s) => [s.dataset.id, Number(s.value)]));
@@ -171,7 +180,10 @@ async function save() {
     ris ? { days: ris.result.days, captureDate: ris.captureDate } : null,
     new Date().toISOString(),
   );
+  const savedAt = taipeiDateTimeString(new Date()); // row ID: Taipei time at the moment of pressing save
+  saving = true;
   $('save-btn').disabled = true;
+  $('reload-btn').disabled = true; // reload would swap `current` mid-sequence
   setMsg('save-msg', '儲存中…');
   let historyDone = false;
   try {
@@ -191,27 +203,38 @@ async function save() {
     current = { data: next, sha };
     $('last-update').textContent = formatTaipei(new Date(next.lastUpdate), false);
     clearRis('已儲存，上傳狀態已清除');
-    setMsg('save-msg', '已儲存，約 1 分鐘後前台更新', 'ok');
+    try {
+      const items = next.items;
+      const oldExp = await getText(token, EXPECTED_PATH);
+      const text = appendCsvRow(oldExp ? oldExp.text : '', buildExpectedRow(savedAt, items), expectedColumns(items));
+      await putText(token, EXPECTED_PATH, text, oldExp ? oldExp.sha : undefined, `Log expected weeks ${savedAt}`);
+      setMsg('save-msg', '已儲存，約 1 分鐘後前台更新', 'ok');
+    } catch (e2) {
+      setMsg('save-msg', `公告表已更新，但預計等候記錄寫入失敗；再按一次儲存可補記（時間為補存當下）（${errorText(e2)}）`, 'err');
+    }
   } catch (e) {
     const t = errorText(e);
     const retry = e.status === 409 ? '請按「重新載入」後重新選檔再存（分析記錄不會重複）' : '請重試儲存';
     setMsg('save-msg', historyDone ? `分析記錄已寫入，但公告表更新失敗，${retry}（${t}）` : t, 'err');
   } finally {
+    saving = false;
     $('save-btn').disabled = false;
+    $('reload-btn').disabled = false;
   }
 }
 
-async function downloadHistory() {
-  $('download-btn').disabled = true;
+// Download a CSV from the repo via the Contents API, with a UTF-8 BOM prepended.
+async function downloadCsv(btnId, path, filename, emptyMsg) {
+  $(btnId).disabled = true;
   setMsg('save-msg', '下載中…');
   try {
-    const r = await getText(token, HISTORY_PATH);
-    if (!r) { setMsg('save-msg', '尚無分析記錄', 'err'); return; }
+    const r = await getText(token, path);
+    if (!r) { setMsg('save-msg', emptyMsg, 'err'); return; }
     const blob = new Blob(['﻿' + r.text], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = '每日等待時間分析.csv';
+    a.download = filename;
     document.body.append(a);
     a.click();
     a.remove();
@@ -220,7 +243,7 @@ async function downloadHistory() {
   } catch (e) {
     setMsg('save-msg', errorText(e), 'err');
   } finally {
-    $('download-btn').disabled = false;
+    $(btnId).disabled = false;
   }
 }
 
@@ -255,7 +278,8 @@ $('login-btn').addEventListener('click', login);
 $('pw').addEventListener('keydown', (e) => { if (e.key === 'Enter' && !$('login-btn').disabled) login(); });
 $('save-btn').addEventListener('click', save);
 $('reload-btn').addEventListener('click', loadData);
-$('download-btn').addEventListener('click', downloadHistory);
+$('download-btn').addEventListener('click', () => downloadCsv('download-btn', HISTORY_PATH, '每日等待時間分析.csv', '尚無分析記錄'));
+$('download-expected-btn').addEventListener('click', () => downloadCsv('download-expected-btn', EXPECTED_PATH, '預計等候時間記錄.csv', '尚無預計等候記錄'));
 $('ris-file').addEventListener('change', onRisFile);
 $('ris-date').addEventListener('change', onRisDate);
 

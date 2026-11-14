@@ -1,5 +1,5 @@
 // Public board: clock, data.json fetch, table rendering.
-import { legendEntries, weekStyle, actualStyle, validateData, formatTaipei, formatLastUpdate, buildDataUrl } from './core.js';
+import { legendEntries, weekStyle, actualStyle, validateData, formatTaipei, formatLastUpdate, buildDataUrl } from './core.js?v=20261114c';
 
 const $ = (id) => document.getElementById(id);
 

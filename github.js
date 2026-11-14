@@ -1,5 +1,5 @@
 // GitHub Contents API client for reading/writing data.json.
-import { encodeBase64Utf8, decodeBase64Utf8 } from './core.js';
+import { encodeBase64Utf8, decodeBase64Utf8 } from './core.js?v=20261114c';
 
 export const REPO = {
   owner: 'weichuncheng0104',

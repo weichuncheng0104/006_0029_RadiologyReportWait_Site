@@ -352,3 +352,42 @@ test('legendEntries: five shared entries; grey only with actual', () => {
   assert.equal(withActual[5].label, '無待打報告');
   assert.equal(withActual[0].bg, WAIT_PALETTE.week1.bg);
 });
+
+// ---- expected_history.csv ----
+import { expectedColumns, buildExpectedRow, appendCsvRow } from '../core.js';
+
+const eItems = [
+  { id: 'a', name: 'X光', weeks: 1 },
+  { id: 'b', name: '電腦斷層', weeks: 4 },
+];
+
+test('expectedColumns: ID first, then one column per item in order', () => {
+  assert.deepEqual(expectedColumns(eItems), ['存檔時間', 'X光_預計週數(4=四週以上)', '電腦斷層_預計週數(4=四週以上)']);
+});
+
+test('buildExpectedRow: numeric weeks from item.weeks', () => {
+  const row = buildExpectedRow('2026-11-14 09:00:00', eItems);
+  assert.equal(row['存檔時間'], '2026-11-14 09:00:00');
+  assert.equal(row['X光_預計週數(4=四週以上)'], '1');
+  assert.equal(row['電腦斷層_預計週數(4=四週以上)'], '4');
+});
+
+test('appendCsvRow: same timestamp twice gives two rows, order kept, no upsert', () => {
+  const cols = expectedColumns(eItems);
+  let t = appendCsvRow('', buildExpectedRow('2026-11-14 09:00:00', eItems), cols);
+  t = appendCsvRow(t, buildExpectedRow('2026-11-13 09:00:00', eItems), cols);
+  t = appendCsvRow(t, buildExpectedRow('2026-11-14 09:00:00', eItems), cols);
+  const rows = csvParse(t);
+  assert.equal(rows.length, 4);
+  assert.deepEqual(rows.slice(1).map((r) => r[0]), ['2026-11-14 09:00:00', '2026-11-13 09:00:00', '2026-11-14 09:00:00']);
+  assert.ok(t.endsWith('\r\n'));
+});
+
+test('appendCsvRow keeps legacy-only columns last with old values, tolerates BOM/LF', () => {
+  const cols = expectedColumns(eItems);
+  const old = '﻿存檔時間,舊欄,X光_預計週數(4=四週以上)\n2026-11-01 08:00:00,keep,2\n';
+  const rows = csvParse(appendCsvRow(old, buildExpectedRow('2026-11-14 09:00:00', eItems), cols));
+  assert.deepEqual(rows[0], [...cols, '舊欄']);
+  assert.deepEqual(rows[1], ['2026-11-01 08:00:00', '2', '', 'keep']);
+  assert.deepEqual(rows[2], ['2026-11-14 09:00:00', '1', '4', '']);
+});

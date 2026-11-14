@@ -277,19 +277,40 @@ export function buildHistoryRow({ fileTime, captureDate, analyzedAt, records, pe
   return row;
 }
 
-// Upsert one row (keyed by ID column) into existing CSV text; header = current columns + legacy-only columns.
-export function upsertHistory(csvText, row, columns) {
+// Parse existing CSV text; header = current columns + legacy-only columns (appended last), rows keyed by header name.
+function mergeWithOld(csvText, columns) {
   const old = csvParse(csvText || '');
   const oldHeader = old.length ? old[0] : [];
-  const extras = oldHeader.filter((h) => !columns.includes(h));
-  const header = [...columns, ...extras];
+  const header = [...columns, ...oldHeader.filter((h) => !columns.includes(h))];
+  const objs = old.slice(1).map((r) => Object.fromEntries(oldHeader.map((h, i) => [h, r[i] ?? ''])));
+  return { header, objs };
+}
+
+// Upsert one row (keyed by ID column) into existing CSV text; header = current columns + legacy-only columns.
+export function upsertHistory(csvText, row, columns) {
+  const { header, objs } = mergeWithOld(csvText, columns);
   const byId = new Map();
-  for (const r of old.slice(1)) {
-    const obj = Object.fromEntries(oldHeader.map((h, i) => [h, r[i] ?? '']));
-    if (obj[HISTORY_ID_COL]) byId.set(obj[HISTORY_ID_COL], obj);
-  }
+  for (const obj of objs) if (obj[HISTORY_ID_COL]) byId.set(obj[HISTORY_ID_COL], obj);
   // Merge over the old row so legacy-only columns keep their values on a same-ID overwrite.
   byId.set(row[HISTORY_ID_COL], { ...(byId.get(row[HISTORY_ID_COL]) ?? {}), ...row });
   const ids = [...byId.keys()].sort();
   return csvSerialize([header, ...ids.map((id) => header.map((h) => byId.get(id)[h] ?? ''))]);
+}
+
+export const EXPECTED_ID_COL = '存檔時間';
+
+export function expectedColumns(items) {
+  return [EXPECTED_ID_COL, ...items.map((it) => `${it.name}_預計週數(4=四週以上)`)];
+}
+
+export function buildExpectedRow(savedAt, items) {
+  const row = { [EXPECTED_ID_COL]: savedAt };
+  for (const it of items) row[`${it.name}_預計週數(4=四週以上)`] = String(it.weeks);
+  return row;
+}
+
+// Append one row (never upsert, never reorder); header = current columns + legacy-only columns.
+export function appendCsvRow(csvText, row, columns) {
+  const { header, objs } = mergeWithOld(csvText, columns);
+  return csvSerialize([header, ...[...objs, row].map((o) => header.map((h) => o[h] ?? ''))]);
 }
