@@ -1,5 +1,5 @@
 {
-  "lastUpdate": "2026-11-14T06:50:51.607Z",
+  "lastUpdate": "2026-11-14T06:55:09.281Z",
   "items": [
     {
       "id": "xray",
@@ -49,7 +49,7 @@
     {
       "id": "vascular_us",
       "name": "四肢血管超音波",
-      "weeks": 1
+      "weeks": 3
     },
     {
       "id": "other_us",
