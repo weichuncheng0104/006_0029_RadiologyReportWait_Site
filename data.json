@@ -1,5 +1,5 @@
 {
-  "lastUpdate": "2026-11-14T06:56:16.846Z",
+  "lastUpdate": "2026-11-14T06:56:35.128Z",
   "items": [
     {
       "id": "xray",
@@ -35,31 +35,31 @@
       "id": "abd_us",
       "name": "腹部超音波",
       "weeks": 4,
-      "actualDays": null
+      "actualDays": 24
     },
     {
       "id": "breast_us",
       "name": "乳房超音波",
       "weeks": 1,
-      "actualDays": 42
+      "actualDays": 45
     },
     {
       "id": "thyroid_us",
       "name": "甲狀腺／頸部超音波",
       "weeks": 1,
-      "actualDays": 23
+      "actualDays": 47
     },
     {
       "id": "carotid_us",
       "name": "頸動脈超音波",
       "weeks": 2,
-      "actualDays": 44
+      "actualDays": 47
     },
     {
       "id": "vascular_us",
       "name": "四肢血管超音波",
       "weeks": 3,
-      "actualDays": 44
+      "actualDays": 47
     },
     {
       "id": "other_us",
@@ -69,7 +69,7 @@
     }
   ],
   "actual": {
-    "captureDate": "2026-06-17",
-    "uploadedAt": "2026-11-14T06:56:16.846Z"
+    "captureDate": "2026-07-18",
+    "uploadedAt": "2026-11-14T06:56:35.128Z"
   }
 }
