@@ -26,9 +26,28 @@
         <thead><tr><th>檢查類別</th><th>預計等候時間</th></tr></thead>
         <tbody id="rows"></tbody>
       </table>
+      <section class="panel" id="ris-panel">
+        <h2>上傳待報清單</h2>
+        <p class="hint">檔案只在本機瀏覽器解析，不會上傳。</p>
+        <label for="ris-file">RIS 匯出 .txt</label>
+        <input id="ris-file" type="file" accept=".txt">
+        <label for="ris-date">擷取日</label>
+        <input id="ris-date" type="date">
+        <p class="msg" id="ris-msg"></p>
+        <div id="ris-result" hidden>
+          <p id="ris-summary"></p>
+          <table class="board" id="ris-preview">
+            <thead><tr><th>類別</th><th>未打件數</th><th>最長天數</th><th>顯示標籤</th></tr></thead>
+            <tbody id="ris-rows"></tbody>
+          </table>
+          <details><summary>未分類項目（名稱＋件數）</summary><ul id="ris-unclassified"></ul></details>
+          <details><summary>各類命中項目（名稱＋件數）</summary><div id="ris-matched"></div></details>
+        </div>
+      </section>
       <div class="actions">
         <button class="btn primary" id="save-btn" type="button">儲存</button>
         <button class="btn secondary" id="reload-btn" type="button">重新載入</button>
+        <button class="btn secondary" id="download-btn" type="button">下載每日等待時間分析.csv</button>
       </div>
       <p class="msg" id="save-msg"></p>
     </section>

@@ -47,3 +47,18 @@ main { max-width: 720px; margin: 0 auto; padding: 16px; }
   .topbar.centered .btn { grid-row: 1; }
   #board th, #board td { font-size: 1.15rem; padding: 12px; }
 }
+/* RIS upload panel (admin) and the optional third column on the board. */
+.panel h2 { margin: 0 0 8px; font-size: 1.1rem; }
+.hint { margin: 0 0 8px; color: #555; font-size: 0.9rem; }
+#ris-preview { margin: 12px 0; }
+#ris-preview th, #ris-preview td { font-size: 0.95rem; padding: 8px; }
+#ris-result details { margin: 8px 0; overflow-wrap: anywhere; }
+#ris-result ul { margin: 4px 0 8px; padding-left: 20px; }
+#board th:nth-child(3), #board td:nth-child(3) { text-align: center; }
+#board th:nth-child(2):not(:last-child), #board td:nth-child(2):not(:last-child) { text-align: center; }
+#board th:nth-child(3) { font-size: 1.05rem; }
+#board.has-actual td.wait { width: 30%; }
+@media (max-width: 480px) {
+  #board th:nth-child(3) { font-size: 0.95rem; }
+  #board td.wait { width: auto; }
+}

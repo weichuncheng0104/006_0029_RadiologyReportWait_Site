@@ -1,5 +1,5 @@
 // Public board: clock, data.json fetch, table rendering.
-import { WEEK_OPTIONS, weekStyle, validateData, formatTaipei, formatLastUpdate, buildDataUrl } from './core.js';
+import { legendEntries, weekStyle, actualStyle, validateData, formatTaipei, formatLastUpdate, buildDataUrl } from './core.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -7,8 +7,8 @@ function tick() {
   $('now').textContent = formatTaipei(new Date(), true);
 }
 
-function renderLegend() {
-  $('legend').replaceChildren(...WEEK_OPTIONS.map((o) => {
+function renderLegend(hasActual) {
+  $('legend').replaceChildren(...legendEntries(hasActual).map((o) => {
     const li = document.createElement('li');
     li.textContent = o.label;
     li.style.background = o.bg;
@@ -17,7 +17,7 @@ function renderLegend() {
   }));
 }
 
-function renderRows(items) {
+function renderRows(items, actual) {
   $('rows').replaceChildren(...items.map((it) => {
     const tr = document.createElement('tr');
     const name = document.createElement('td');
@@ -29,6 +29,16 @@ function renderRows(items) {
     wait.style.background = s.bg;
     wait.style.color = s.fg;
     tr.append(name, wait);
+    if (actual) {
+      const a = document.createElement('td');
+      // Missing key (old/partial data) shows a grey dash; null means no pending reports.
+      const as = Object.hasOwn(it, 'actualDays') ? actualStyle(it.actualDays) : weekStyle(undefined);
+      a.className = 'wait';
+      a.textContent = as.label;
+      a.style.background = as.bg;
+      a.style.color = as.fg;
+      tr.append(a);
+    }
     return tr;
   }));
 }
@@ -39,7 +49,14 @@ async function load() {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const v = validateData(await res.json());
     if (!v.ok) throw new Error(v.error);
-    renderRows(v.data.items);
+    const actual = v.data.actual ?? null;
+    if (actual) {
+      $('actual-th').textContent = `${actual.captureDate.replaceAll('-', '/')}：報告等待時間`;
+      $('actual-th').hidden = false;
+      $('board').classList.add('has-actual');
+    }
+    renderLegend(Boolean(actual));
+    renderRows(v.data.items, actual);
     $('last-update').textContent = formatLastUpdate(v.data.lastUpdate);
   } catch {
     $('error').hidden = false;
@@ -49,5 +66,5 @@ async function load() {
 
 tick();
 setInterval(tick, 1000);
-renderLegend();
+renderLegend(false);
 load();

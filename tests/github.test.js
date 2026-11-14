@@ -56,3 +56,33 @@ test('describeApiError messages', () => {
   assert.ok(!describeApiError(422).includes('重新載入'));
   assert.equal(describeApiError(500), 'GitHub 回應錯誤（HTTP 500）');
 });
+
+import { getText, putText, ApiError } from '../github.js';
+
+test('getText: 404 -> null; 200 -> text+sha; 401/403 throw', async () => {
+  const log = [];
+  assert.equal(await getText('T', 'history.csv', fakeFetch(404, {}, log)), null);
+  assert.ok(log[0].url.includes('/contents/history.csv?ref=main'));
+  const r = await getText('T', 'history.csv', fakeFetch(200, { content: encodeBase64Utf8('a,b\r\n'), sha: 's1' }, []));
+  assert.deepEqual(r, { text: 'a,b\r\n', sha: 's1' });
+  for (const st of [401, 403]) {
+    await assert.rejects(() => getText('T', 'history.csv', fakeFetch(st, {}, [])), (e) => e instanceof ApiError && e.status === st);
+  }
+});
+
+test('getText: files over 1MB (encoding none) throw instead of reading as empty', async () => {
+  await assert.rejects(() => getText('T', 'history.csv', fakeFetch(200, { content: '', encoding: 'none', sha: 's1' }, [])), /過大/);
+});
+
+test('putText omits sha when undefined, sends it when given', async () => {
+  const log = [];
+  const s = await putText('T', 'history.csv', 'x,y\r\n', undefined, 'Add analysis X', fakeFetch(201, { content: { sha: 'n1' } }, log));
+  assert.equal(s, 'n1');
+  const b = JSON.parse(log[0].init.body);
+  assert.ok(!('sha' in b));
+  assert.equal(b.message, 'Add analysis X');
+  assert.equal(decodeBase64Utf8(b.content), 'x,y\r\n');
+  await putText('T', 'history.csv', 'z', 'old', 'm', fakeFetch(200, { content: { sha: 'n2' } }, log));
+  assert.equal(JSON.parse(log[1].init.body).sha, 'old');
+  assert.ok(log[1].init.method === 'PUT' && log[1].url.endsWith('/contents/history.csv'));
+});

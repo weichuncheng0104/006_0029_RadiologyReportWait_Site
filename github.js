@@ -65,3 +65,38 @@ export async function putFile(token, data, sha, fetchImpl = fetch) {
   });
   return body.content.sha;
 }
+
+function contentsUrl(path) {
+  return `https://api.github.com/repos/${REPO.owner}/${REPO.repo}/contents/${path}`;
+}
+
+// Read a text file at `path`; only here is a 404 treated as "does not exist" (returns null).
+export async function getText(token, path, fetchImpl = fetch) {
+  let res;
+  try {
+    res = await fetchImpl(`${contentsUrl(path)}?ref=${REPO.branch}`, { headers: headers(token), cache: 'no-store' });
+  } catch {
+    throw new ApiError(0);
+  }
+  if (res.status === 404) return null;
+  if (!res.ok) throw new ApiError(res.status);
+  const body = await res.json();
+  // Contents API omits content for files over 1MB; never treat that as an empty file (would wipe history on upsert).
+  if (body.encoding && body.encoding !== 'base64') throw new Error(`${path} 過大，無法經 API 讀取`);
+  return { text: decodeBase64Utf8(body.content), sha: body.sha };
+}
+
+// Create/update a text file at `path`; sha omitted for a new file. Returns the new sha.
+export async function putText(token, path, text, sha, message, fetchImpl = fetch) {
+  const body = await request(fetchImpl, contentsUrl(path), {
+    method: 'PUT',
+    headers: { ...headers(token), 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      message,
+      content: encodeBase64Utf8(text),
+      ...(sha ? { sha } : {}),
+      branch: REPO.branch,
+    }),
+  });
+  return body.content.sha;
+}
