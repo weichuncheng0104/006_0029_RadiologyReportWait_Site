@@ -4,8 +4,8 @@ import {
   parseRisText, computeActual, actualStyle, completionRate, formatRate, taipeiDateString, buildNextData,
   taipeiDateTimeString, historyColumns, buildHistoryRow, upsertHistory,
   expectedColumns, buildExpectedRow, appendCsvRow,
-} from './core.js?v=20261116b';
-import { getFile, putFile, getText, putText } from './github.js?v=20261116b';
+} from './core.js?v=20261116c';
+import { getFile, putFile, getText, putText } from './github.js?v=20261116c';
 
 const $ = (id) => document.getElementById(id);
 const HISTORY_PATH = 'history.csv';
