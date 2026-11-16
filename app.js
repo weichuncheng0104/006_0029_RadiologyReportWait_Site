@@ -1,5 +1,5 @@
 // Public board: clock, data.json fetch, table rendering.
-import { legendEntries, weekStyle, actualStyle, formatRate, validateData, formatTaipei, formatLastUpdate, buildDataUrl } from './core.js?v=20261116a';
+import { legendEntries, weekStyle, actualStyle, formatRate, validateData, formatTaipei, formatLastUpdate, buildDataUrl } from './core.js?v=20261116b';
 
 const $ = (id) => document.getElementById(id);
 
@@ -57,7 +57,7 @@ async function load() {
     if (!v.ok) throw new Error(v.error);
     const actual = v.data.actual ?? null;
     if (actual) {
-      $('actual-th').textContent = `${actual.captureDate.replaceAll('-', '/')}：報告等待時間`;
+      $('actual-th').textContent = `${actual.captureDate.replaceAll('-', '/')}：最長報告等待時間`;
       $('actual-th').hidden = false;
       $('board').classList.add('has-actual');
     }
