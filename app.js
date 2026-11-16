@@ -1,5 +1,5 @@
 // Public board: clock, data.json fetch, table rendering.
-import { legendEntries, weekStyle, actualStyle, validateData, formatTaipei, formatLastUpdate, buildDataUrl } from './core.js?v=20261114c';
+import { legendEntries, weekStyle, actualStyle, formatRate, validateData, formatTaipei, formatLastUpdate, buildDataUrl } from './core.js?v=20261116a';
 
 const $ = (id) => document.getElementById(id);
 
@@ -17,7 +17,7 @@ function renderLegend(hasActual) {
   }));
 }
 
-function renderRows(items, actual) {
+function renderRows(items, actual, hasRate) {
   $('rows').replaceChildren(...items.map((it) => {
     const tr = document.createElement('tr');
     const name = document.createElement('td');
@@ -39,6 +39,12 @@ function renderRows(items, actual) {
       a.style.color = as.fg;
       tr.append(a);
     }
+    if (hasRate) {
+      const r = document.createElement('td');
+      r.className = 'rate';
+      r.textContent = Object.hasOwn(it, 'completionRate') ? formatRate(it.completionRate) : '—';
+      tr.append(r);
+    }
     return tr;
   }));
 }
@@ -55,8 +61,17 @@ async function load() {
       $('actual-th').hidden = false;
       $('board').classList.add('has-actual');
     }
+    // Completion-rate column only for uploads that recorded the exam date range.
+    const hasRate = Boolean(actual && actual.examStart);
+    if (hasRate) {
+      const slash = (d) => d.replaceAll('-', '/');
+      // Zero-width spaces give narrow screens break points inside the long date range.
+      $('rate-th').textContent = `${slash(actual.examStart)}-\u200b${slash(actual.examEnd)}\u200b報告完成率(%)`;
+      $('rate-th').hidden = false;
+      $('board').classList.add('has-rate');
+    }
     renderLegend(Boolean(actual));
-    renderRows(v.data.items, actual);
+    renderRows(v.data.items, actual, hasRate);
     $('last-update').textContent = formatLastUpdate(v.data.lastUpdate);
   } catch {
     $('error').hidden = false;

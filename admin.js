@@ -1,11 +1,11 @@
 // Admin page: password unlocks the encrypted token, edit weeks, save via GitHub Contents API.
 import {
   WEEK_OPTIONS, weekStyle, validateData, formatTaipei, formatLastUpdate, decryptToken,
-  parseRisText, computeActual, actualStyle, taipeiDateString, buildNextData,
+  parseRisText, computeActual, actualStyle, completionRate, formatRate, taipeiDateString, buildNextData,
   taipeiDateTimeString, historyColumns, buildHistoryRow, upsertHistory,
   expectedColumns, buildExpectedRow, appendCsvRow,
-} from './core.js?v=20261114c';
-import { getFile, putFile, getText, putText } from './github.js?v=20261114c';
+} from './core.js?v=20261116a';
+import { getFile, putFile, getText, putText } from './github.js?v=20261116a';
 
 const $ = (id) => document.getElementById(id);
 const HISTORY_PATH = 'history.csv';
@@ -77,11 +77,13 @@ function renderRis() {
   const unclassifiedKinds = Object.keys(result.unclassified).length;
   const pendingItems = Object.values(result.counts).reduce((a, b) => a + b, 0)
     + Object.values(result.unclassified).reduce((a, b) => a + b, 0);
-  $('ris-summary').textContent = `檔案時間(ID) ${ris.fileTime}；紀錄數 ${records.length}；略過 ${ris.skipped} 筆格式錯誤；未打報告 ${result.pendingTotal} 筆、${pendingItems} 項；未分類 ${unclassifiedKinds} 種`;
+  $('ris-summary').textContent = `檔案時間(ID) ${ris.fileTime}；檢查日 ${result.examStart ?? '—'}～${result.examEnd ?? '—'}；紀錄數 ${records.length}；略過 ${ris.skipped} 筆格式錯誤；未打報告 ${result.pendingTotal} 筆、${pendingItems} 項；未分類 ${unclassifiedKinds} 種`;
   $('ris-rows').replaceChildren(...current.data.items.map((it) => {
     const s = actualStyle(result.days[it.id]);
     const tr = document.createElement('tr');
-    const cells = [it.name, String(result.counts[it.id]), result.days[it.id] === null ? '—' : String(result.days[it.id]), s.label]
+    const rate = formatRate(completionRate(result.done[it.id], result.counts[it.id]));
+    const cells = [it.name, String(result.counts[it.id]), result.days[it.id] === null ? '—' : String(result.days[it.id]), s.label,
+      String(result.done[it.id]), rate]
       .map((t) => { const td = document.createElement('td'); td.textContent = t; return td; });
     cells[3].style.background = s.bg;
     cells[3].style.color = s.fg;
@@ -177,7 +179,7 @@ async function save() {
   if (ris && !ris.captureDate) { setMsg('ris-msg', '請選擇擷取日', 'err'); setMsg('save-msg', '請選擇擷取日', 'err'); return; }
   const next = buildNextData(
     current.data, weeksById,
-    ris ? { days: ris.result.days, captureDate: ris.captureDate } : null,
+    ris ? { ...ris.result, captureDate: ris.captureDate } : null,
     new Date().toISOString(),
   );
   const savedAt = taipeiDateTimeString(new Date()); // row ID: Taipei time at the moment of pressing save
@@ -191,8 +193,9 @@ async function save() {
       const items = current.data.items;
       const row = buildHistoryRow({
         fileTime: ris.fileTime, captureDate: ris.captureDate, analyzedAt: taipeiDateTimeString(new Date(next.lastUpdate)),
+        examStart: ris.result.examStart, examEnd: ris.result.examEnd,
         records: ris.records.length, pendingTotal: ris.result.pendingTotal,
-        days: ris.result.days, counts: ris.result.counts,
+        days: ris.result.days, counts: ris.result.counts, done: ris.result.done,
       }, items);
       const old = await getText(token, HISTORY_PATH);
       const text = upsertHistory(old ? old.text : '', row, historyColumns(items));

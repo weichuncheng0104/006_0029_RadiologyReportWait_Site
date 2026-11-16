@@ -39,7 +39,12 @@ export function validateData(obj) {
   const badDays = obj.items.some((it) => Object.hasOwn(it, 'actualDays')
     && it.actualDays !== null && !(Number.isInteger(it.actualDays) && it.actualDays >= 0));
   if (badDays) return { ok: false, error: 'bad actualDays' };
+  const badRate = obj.items.some((it) => Object.hasOwn(it, 'completionRate') && it.completionRate !== null
+    && !(Number.isFinite(it.completionRate) && it.completionRate >= 0 && it.completionRate <= 100));
+  if (badRate) return { ok: false, error: 'bad completionRate' };
   if (obj.actual !== undefined && (!obj.actual || typeof obj.actual.captureDate !== 'string')) return { ok: false, error: 'bad actual' };
+  if (obj.actual && (Object.hasOwn(obj.actual, 'examStart') || Object.hasOwn(obj.actual, 'examEnd'))
+    && (typeof obj.actual.examStart !== 'string' || typeof obj.actual.examEnd !== 'string')) return { ok: false, error: 'bad exam range' };
   return { ok: true, data: obj };
 }
 
@@ -113,6 +118,7 @@ export async function decryptToken(blob, password) {
 // --- RIS pending-report list: parsing, classification, wait-time stats. Only exam date, status and item names are read.
 
 const PENDING_STATUSES = new Set(['檢查畢 尚未處理', '檢查畢 編輯中']);
+const DONE_STATUS = '檢查畢 已發送'; // completion-rate numerator; exams not yet performed (尚未處理) count nowhere
 const EXCLUDE_RE = /COPY|光碟|導引|穿刺|切片|specimen|內視鏡|鏡檢|SPECT|核子/i;
 // Ordered rules: first hit wins. CT is case-sensitive (avoids matching words like "duct").
 const CATEGORY_RULES = [
@@ -172,12 +178,20 @@ export function daysBetween(examDate, captureDate) {
 }
 
 export function computeActual(records, captureDate, categoryIds) {
-  const days = {}; const counts = {}; const matched = {};
-  for (const id of categoryIds) { days[id] = null; counts[id] = 0; matched[id] = {}; }
+  const days = {}; const counts = {}; const matched = {}; const done = {};
+  for (const id of categoryIds) { days[id] = null; counts[id] = 0; matched[id] = {}; done[id] = 0; }
   const unclassified = {};
   let pendingTotal = 0;
+  let examStart = null; let examEnd = null;
   for (const r of records) {
-    if (!PENDING_STATUSES.has(String(r.status).trim())) continue;
+    if (examStart === null || r.examDate < examStart) examStart = r.examDate;
+    if (examEnd === null || r.examDate > examEnd) examEnd = r.examDate;
+    const status = String(r.status).trim();
+    if (status === DONE_STATUS) {
+      for (const name of r.items) { const id = classifyItem(name); if (id !== null && id in done) done[id] += 1; }
+      continue;
+    }
+    if (!PENDING_STATUSES.has(status)) continue;
     pendingTotal += 1;
     const d = daysBetween(r.examDate, captureDate);
     for (const name of r.items) {
@@ -188,7 +202,17 @@ export function computeActual(records, captureDate, categoryIds) {
       if (days[id] === null || d > days[id]) days[id] = d;
     }
   }
-  return { days, counts, matched, unclassified, pendingTotal };
+  return { days, counts, matched, unclassified, pendingTotal, done, examStart, examEnd };
+}
+
+// Report completion rate (%) = done / (done + pending), one decimal; null when the category has no examined items.
+export function completionRate(done, pending) {
+  const total = done + pending;
+  return total === 0 ? null : Math.round((1000 * done) / total) / 10;
+}
+
+export function formatRate(rate) {
+  return rate === null || rate === undefined ? '—' : rate.toFixed(1);
 }
 
 export function actualStyle(days) {
@@ -205,7 +229,7 @@ export function taipeiDateString(date) {
   return formatTaipei(date, false).slice(0, 10);
 }
 
-// Assemble the data.json payload to save. risResult: { days, captureDate } | null.
+// Assemble the data.json payload to save. risResult: { days, counts, done, captureDate, examStart, examEnd } | null.
 export function buildNextData(data, weeksById, risResult, nowIso) {
   const next = {
     ...data,
@@ -213,10 +237,15 @@ export function buildNextData(data, weeksById, risResult, nowIso) {
     items: data.items.map((it) => ({
       ...it,
       weeks: weeksById[it.id],
-      ...(risResult ? { actualDays: risResult.days[it.id] ?? null } : {}),
+      ...(risResult ? {
+        actualDays: risResult.days[it.id] ?? null,
+        completionRate: completionRate(risResult.done[it.id] ?? 0, risResult.counts[it.id] ?? 0),
+      } : {}),
     })),
   };
-  if (risResult) next.actual = { captureDate: risResult.captureDate, uploadedAt: nowIso };
+  if (risResult) {
+    next.actual = { captureDate: risResult.captureDate, uploadedAt: nowIso, examStart: risResult.examStart, examEnd: risResult.examEnd };
+  }
   return next;
 }
 
@@ -260,19 +289,22 @@ export function csvSerialize(rows) {
 export const HISTORY_ID_COL = '檔案時間(ID)';
 
 export function historyColumns(items) {
-  return [HISTORY_ID_COL, '擷取日', '分析時間', '紀錄數', '未打報告筆數',
-    ...items.flatMap((it) => [`${it.name}_最長天數`, `${it.name}_未完成件數`])];
+  return [HISTORY_ID_COL, '擷取日', '檢查日起', '檢查日迄', '分析時間', '紀錄數', '未打報告筆數',
+    ...items.flatMap((it) => [`${it.name}_最長天數`, `${it.name}_未完成件數`, `${it.name}_已完成件數`, `${it.name}_完成率(%)`])];
 }
 
-export function buildHistoryRow({ fileTime, captureDate, analyzedAt, records, pendingTotal, days, counts }, items) {
+export function buildHistoryRow({ fileTime, captureDate, examStart, examEnd, analyzedAt, records, pendingTotal, days, counts, done = {} }, items) {
   const row = {
-    [HISTORY_ID_COL]: fileTime, 擷取日: captureDate, 分析時間: analyzedAt,
+    [HISTORY_ID_COL]: fileTime, 擷取日: captureDate, 檢查日起: examStart ?? '', 檢查日迄: examEnd ?? '', 分析時間: analyzedAt,
     紀錄數: String(records), 未打報告筆數: String(pendingTotal),
   };
   for (const it of items) {
     const d = days[it.id];
+    const rate = completionRate(done[it.id] ?? 0, counts[it.id] ?? 0);
     row[`${it.name}_最長天數`] = d === null || d === undefined ? '' : String(d);
     row[`${it.name}_未完成件數`] = String(counts[it.id] ?? 0);
+    row[`${it.name}_已完成件數`] = String(done[it.id] ?? 0);
+    row[`${it.name}_完成率(%)`] = rate === null ? '' : rate.toFixed(1);
   }
   return row;
 }

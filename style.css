@@ -58,7 +58,16 @@ main { max-width: 720px; margin: 0 auto; padding: 16px; }
 #board th:nth-child(2):not(:last-child), #board td:nth-child(2):not(:last-child) { text-align: center; }
 #board th:nth-child(3) { font-size: 1.05rem; }
 #board.has-actual td.wait { width: 30%; }
+/* Optional fourth column: report completion rate (%). */
+#board th:nth-child(4), #board td:nth-child(4) { text-align: center; }
+#board th:nth-child(4) { font-size: 1.05rem; }
+#board td.rate { font-weight: 700; }
+#board.has-rate td.wait { width: 24%; }
+#board.has-rate td.rate { width: 22%; }
 @media (max-width: 480px) {
-  #board th:nth-child(3) { font-size: 0.95rem; }
+  #board th:nth-child(3), #board th:nth-child(4) { font-size: 0.95rem; }
+  #board td.rate { width: auto; }
+  #board.has-rate th, #board.has-rate td { font-size: 0.95rem; padding: 10px 6px; }
+  #board.has-rate th:nth-child(3), #board.has-rate th:nth-child(4) { font-size: 0.8rem; }
   #board td.wait { width: auto; }
 }

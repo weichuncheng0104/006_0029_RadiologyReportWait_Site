@@ -231,17 +231,18 @@ const BASE = {
   items: [{ id: 'ct', name: 'CT', weeks: 1 }, { id: 'mri', name: 'MRI', weeks: 2 }],
 };
 
-test('buildNextData with ris adds only actual and actualDays', () => {
-  const n = buildNextData(BASE, { ct: 3, mri: 4 }, { days: { ct: 9 }, captureDate: '2026-10-20' }, '2026-11-01T00:00:00.000Z');
-  assert.deepEqual(n.actual, { captureDate: '2026-10-20', uploadedAt: '2026-11-01T00:00:00.000Z' });
+test('buildNextData with ris adds only actual, actualDays and completionRate', () => {
+  const ris = { days: { ct: 9 }, counts: { ct: 1 }, done: { ct: 1 }, captureDate: '2026-10-20', examStart: '2026-09-01', examEnd: '2026-09-30' };
+  const n = buildNextData(BASE, { ct: 3, mri: 4 }, ris, '2026-11-01T00:00:00.000Z');
+  assert.deepEqual(n.actual, { captureDate: '2026-10-20', uploadedAt: '2026-11-01T00:00:00.000Z', examStart: '2026-09-01', examEnd: '2026-09-30' });
   assert.equal(n.lastUpdate, '2026-11-01T00:00:00.000Z');
   assert.deepEqual(n.items, [
-    { id: 'ct', name: 'CT', weeks: 3, actualDays: 9 },
-    { id: 'mri', name: 'MRI', weeks: 4, actualDays: null },
+    { id: 'ct', name: 'CT', weeks: 3, actualDays: 9, completionRate: 50 },
+    { id: 'mri', name: 'MRI', weeks: 4, actualDays: null, completionRate: null },
   ]);
   assert.equal(Object.hasOwn(n.items[1], 'actualDays') && n.items[1].actualDays === null, true);
   assert.deepEqual(Object.keys(n).sort(), ['actual', 'items', 'lastUpdate']);
-  assert.deepEqual(Object.keys(n.items[0]).sort(), ['actualDays', 'id', 'name', 'weeks']);
+  assert.deepEqual(Object.keys(n.items[0]).sort(), ['actualDays', 'completionRate', 'id', 'name', 'weeks']);
 });
 
 test('buildNextData without ris keeps previous actual and actualDays', () => {
@@ -283,11 +284,6 @@ test('csvParse tolerates BOM and LF', () => {
   assert.deepEqual(csvParse('﻿a,b\n1,2\n'), [['a', 'b'], ['1', '2']]);
 });
 
-test('historyColumns order', () => {
-  assert.deepEqual(historyColumns(HITEMS), ['檔案時間(ID)', '擷取日', '分析時間', '紀錄數', '未打報告筆數',
-    'CT_最長天數', 'CT_未完成件數', 'MRI_最長天數', 'MRI_未完成件數']);
-});
-
 test('buildHistoryRow: null days -> empty string, zero count kept', () => {
   const r = hrow('2026-11-14 09:00:00');
   assert.equal(r['MRI_最長天數'], '');
@@ -304,7 +300,7 @@ test('upsertHistory: new file, same ID overwrites, sorted', () => {
   assert.equal(rows.length, 3);
   assert.equal(rows[1][0], '2026-11-13 09:00:00');
   assert.equal(rows[2][0], '2026-11-14 09:00:00');
-  assert.equal(rows[2][4], '99');
+  assert.equal(rows[2][rows[0].indexOf('未打報告筆數')], '99');
   assert.ok(!t.startsWith('﻿'));
 });
 
@@ -312,11 +308,12 @@ test('upsertHistory keeps legacy-only columns and tolerates BOM/LF input', () =>
   const cols = historyColumns(HITEMS);
   const old = '﻿檔案時間(ID),擷取日,舊類_最長天數,CT_最長天數\n2026-11-01 08:00:00,2026-11-01,7,4\n';
   const rows = csvParse(upsertHistory(old, hrow('2026-11-14 09:00:00'), cols));
-  assert.deepEqual(rows[0].slice(0, 9), cols);
-  assert.equal(rows[0][9], '舊類_最長天數');
-  assert.equal(rows[1][9], '7');
-  assert.equal(rows[1][5], '4');
-  assert.equal(rows[2][9], '');
+  const n = cols.length;
+  assert.deepEqual(rows[0].slice(0, n), cols);
+  assert.equal(rows[0][n], '舊類_最長天數');
+  assert.equal(rows[1][n], '7');
+  assert.equal(rows[1][cols.indexOf('CT_最長天數')], '4');
+  assert.equal(rows[2][n], '');
 });
 
 test('upsertHistory same-ID overwrite keeps legacy-only values', () => {
@@ -324,9 +321,10 @@ test('upsertHistory same-ID overwrite keeps legacy-only values', () => {
   const old = '檔案時間(ID),舊類_最長天數\r\n2026-11-14 09:00:00,7\r\n';
   const rows = csvParse(upsertHistory(old, hrow('2026-11-14 09:00:00', { pendingTotal: 5 }), cols));
   assert.equal(rows.length, 2);
-  assert.equal(rows[0][9], '舊類_最長天數');
-  assert.equal(rows[1][9], '7');
-  assert.equal(rows[1][4], '5');
+  const n = cols.length;
+  assert.equal(rows[0][n], '舊類_最長天數');
+  assert.equal(rows[1][n], '7');
+  assert.equal(rows[1][cols.indexOf('未打報告筆數')], '5');
 });
 
 test('taipeiDateTimeString', () => {
@@ -390,4 +388,108 @@ test('appendCsvRow keeps legacy-only columns last with old values, tolerates BOM
   assert.deepEqual(rows[0], [...cols, '舊欄']);
   assert.deepEqual(rows[1], ['2026-11-01 08:00:00', '2', '', 'keep']);
   assert.deepEqual(rows[2], ['2026-11-14 09:00:00', '1', '4', '']);
+});
+
+// ---- completion rate (2026-11-16) ----
+import { completionRate, formatRate } from '../core.js';
+
+test('computeActual: done counts only 檢查畢 已發送; 尚未處理 excluded everywhere; exam range from all records', () => {
+  const records = [
+    { examDate: '2026-10-12', status: '檢查畢 已發送', items: ['CHEST PA', 'MRI BRAIN'] },
+    { examDate: '2026-10-20', status: '檢查畢 尚未處理', items: ['CHEST PA'] },
+    { examDate: '2026-10-21', status: '檢查畢 編輯中', items: ['CHEST PA'] },
+    { examDate: '2026-10-05', status: '尚未處理', items: ['CHEST PA', 'MRI BRAIN'] },
+    { examDate: '2026-11-16', status: '已發送', items: ['CHEST PA'] },
+    { examDate: '2026-10-15', status: '檢查畢 已發送', items: ['Mystery Item', 'COPY Ｘ光光碟片'] },
+  ];
+  const r = computeActual(records, '2026-11-16', ['xray', 'mri', 'ct']);
+  assert.deepEqual(r.done, { xray: 1, mri: 1, ct: 0 });
+  assert.deepEqual(r.counts, { xray: 2, mri: 0, ct: 0 });
+  assert.equal(r.examStart, '2026-10-05');
+  assert.equal(r.examEnd, '2026-11-16');
+});
+
+test('completionRate: done/(done+pending) %, 1 decimal; null when no items', () => {
+  assert.equal(completionRate(1455, 78), 94.9);
+  assert.equal(completionRate(1, 2), 33.3);
+  assert.equal(completionRate(2, 1), 66.7);
+  assert.equal(completionRate(0, 5), 0);
+  assert.equal(completionRate(5, 0), 100);
+  assert.equal(completionRate(0, 0), null);
+  assert.equal(formatRate(94.9), '94.9');
+  assert.equal(formatRate(100), '100.0');
+  assert.equal(formatRate(0), '0.0');
+  assert.equal(formatRate(null), '—');
+  assert.equal(formatRate(undefined), '—');
+});
+
+test('buildNextData with ris adds completionRate and exam range', () => {
+  const ris = { days: { ct: 9 }, counts: { ct: 1, mri: 0 }, done: { ct: 3, mri: 0 },
+    captureDate: '2026-11-16', examStart: '2026-10-12', examEnd: '2026-11-16' };
+  const n = buildNextData(BASE, { ct: 3, mri: 4 }, ris, 'now');
+  assert.deepEqual(n.actual, { captureDate: '2026-11-16', uploadedAt: 'now', examStart: '2026-10-12', examEnd: '2026-11-16' });
+  assert.deepEqual(n.items, [
+    { id: 'ct', name: 'CT', weeks: 3, actualDays: 9, completionRate: 75 },
+    { id: 'mri', name: 'MRI', weeks: 4, actualDays: null, completionRate: null },
+  ]);
+});
+
+test('validateData: completionRate null or 0..100 number; exam range strings when present', () => {
+  const mk = (extra, actual) => ({ lastUpdate: null, items: [{ id: 'ct', name: 'CT', weeks: 1, ...extra }], ...(actual ? { actual } : {}) });
+  for (const ok of [null, 0, 94.9, 100]) assert.equal(validateData(mk({ completionRate: ok })).ok, true, String(ok));
+  for (const bad of [-1, 100.1, '9', NaN, undefined, Infinity]) assert.equal(validateData(mk({ completionRate: bad })).ok, false, String(bad));
+  assert.equal(validateData(mk({}, { captureDate: 'd', examStart: 'a', examEnd: 'b' })).ok, true);
+  assert.equal(validateData(mk({}, { captureDate: 'd', examStart: 5, examEnd: 'b' })).ok, false);
+  assert.equal(validateData(mk({}, { captureDate: 'd', examStart: 'a' })).ok, false);
+});
+
+test('history columns/row carry exam range, done count and rate', () => {
+  assert.deepEqual(historyColumns(HITEMS), ['檔案時間(ID)', '擷取日', '檢查日起', '檢查日迄', '分析時間', '紀錄數', '未打報告筆數',
+    'CT_最長天數', 'CT_未完成件數', 'CT_已完成件數', 'CT_完成率(%)',
+    'MRI_最長天數', 'MRI_未完成件數', 'MRI_已完成件數', 'MRI_完成率(%)']);
+  const r = hrow('2026-11-16 07:00:00', { examStart: '2026-10-12', examEnd: '2026-11-16', done: { ct: 6, mri: 0 } });
+  assert.equal(r['檢查日起'], '2026-10-12');
+  assert.equal(r['檢查日迄'], '2026-11-16');
+  assert.equal(r['CT_已完成件數'], '6');
+  assert.equal(r['CT_完成率(%)'], '75.0');
+  assert.equal(r['MRI_已完成件數'], '0');
+  assert.equal(r['MRI_完成率(%)'], '');
+});
+
+test('upsertHistory: old-format csv keeps its rows, new columns blank for them', () => {
+  const oldHeader = ['檔案時間(ID)', '擷取日', '分析時間', '紀錄數', '未打報告筆數', 'CT_最長天數', 'CT_未完成件數', 'MRI_最長天數', 'MRI_未完成件數'];
+  const oldText = csvSerialize([oldHeader, ['2026-10-20 08:00:00', '2026-10-20', 'x', '9', '2', '49', '2', '', '0']]);
+  const cols = historyColumns(HITEMS);
+  const t = upsertHistory(oldText, hrow('2026-11-16 07:00:00', { examStart: '2026-10-12', examEnd: '2026-11-16', done: { ct: 6, mri: 0 } }), cols);
+  const rows = csvParse(t);
+  assert.deepEqual(rows[0], cols);
+  assert.equal(rows.length, 3);
+  const old = Object.fromEntries(cols.map((c, i) => [c, rows[1][i]]));
+  assert.equal(old['CT_最長天數'], '49');
+  assert.equal(old['CT_完成率(%)'], '');
+  assert.equal(old['檢查日起'], '');
+});
+
+test('computeActual: capture-day exams count; multiple same-category items in one record count per item', () => {
+  const records = [
+    { examDate: '2026-11-16', status: '檢查畢 已發送', items: ['CHEST PA', 'KNEE AP', 'MRI BRAIN'] },
+    { examDate: '2026-11-16', status: '檢查畢 尚未處理', items: ['CHEST PA', 'SPINE LAT'] },
+  ];
+  const r = computeActual(records, '2026-11-16', ['xray', 'mri']);
+  assert.deepEqual(r.done, { xray: 2, mri: 1 });
+  assert.deepEqual(r.counts, { xray: 2, mri: 0 });
+  assert.deepEqual(r.days, { xray: 0, mri: null });
+  assert.equal(completionRate(r.done.xray, r.counts.xray), 50);
+});
+
+test('buildNextData without ris keeps previous completionRate and exam range', () => {
+  const prev = {
+    lastUpdate: 'old',
+    actual: { captureDate: '2026-11-16', uploadedAt: 'u', examStart: '2026-10-12', examEnd: '2026-11-16' },
+    items: [{ id: 'ct', name: 'CT', weeks: 1, actualDays: 13, completionRate: 94.9 }],
+  };
+  const n = buildNextData(prev, { ct: 2 }, null, 'now');
+  assert.deepEqual(n.actual, prev.actual);
+  assert.deepEqual(n.items, [{ id: 'ct', name: 'CT', weeks: 2, actualDays: 13, completionRate: 94.9 }]);
+  assert.equal(validateData(n).ok, true);
 });
