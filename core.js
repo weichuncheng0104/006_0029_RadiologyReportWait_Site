@@ -168,6 +168,50 @@ export function parseRisText(text, stats) {
   return out;
 }
 
+// 007 MJB3W001 bookmarklet JSON (schema mjb3w001-list/1). Fail-loud: throws on anything that could silently skew the stats.
+export const RIS_JSON_SCHEMA = 'mjb3w001-list/1';
+const KNOWN_STATUSES = new Set([DONE_STATUS, ...PENDING_STATUSES, '尚未處理', '已發送', '編輯中']);
+
+export function parseRisJson(obj, stats) {
+  if (!obj || obj.schema !== RIS_JSON_SCHEMA) throw new Error(`不支援的 JSON 格式（需為 ${RIS_JSON_SCHEMA}）`);
+  const rows = obj.rows;
+  if (!Array.isArray(rows) || obj.harvested !== obj.reported_total || rows.length !== obj.reported_total) {
+    throw new Error('JSON 筆數與頁面「共N筆」不符，請重新擷取');
+  }
+  if (!Array.isArray(obj.warnings) || obj.warnings.length > 0) throw new Error('JSON 含擷取警告，請重新擷取');
+  const cols = Array.isArray(obj.columns) ? obj.columns : [];
+  const iDate = cols.indexOf('檢查日'); const iStatus = cols.indexOf('狀態'); const iItems = cols.indexOf('檢查項目');
+  if (iDate < 0 || iStatus < 0 || iItems < 0) throw new Error('JSON 缺少 檢查日／狀態／檢查項目 欄');
+  const out = [];
+  let skipped = 0; let examined = 0;
+  for (const r of rows) {
+    if (!Array.isArray(r) || r.length !== cols.length || [iDate, iStatus, iItems].some((i) => typeof r[i] !== 'string')) {
+      throw new Error('JSON 列格式錯誤，請重新擷取');
+    }
+    const status = String(r[iStatus] ?? '').trim();
+    if (!KNOWN_STATUSES.has(status)) throw new Error(`JSON 含未知狀態值「${status}」`);
+    if (status.startsWith('檢查畢')) examined += 1;
+    const m = /^(\d{4})\/(\d{2})\/(\d{2})\b/.exec(String(r[iDate] ?? '').trim());
+    if (!m || !isRealDate(Number(m[1]), Number(m[2]), Number(m[3]))) { skipped += 1; continue; }
+    const items = String(r[iItems] ?? '').split('\n').map((x) => x.trim()).filter(Boolean);
+    out.push({ examDate: `${m[1]}-${m[2]}-${m[3]}`, status, items });
+  }
+  // Real lists are mostly 檢查畢; none at all means the check-mark prefix was lost upstream.
+  if (rows.length > 0 && examined === 0) throw new Error('JSON 狀態欄沒有任何「檢查畢」，疑似擷取遺漏，請重新擷取');
+  if (stats) stats.skipped = skipped;
+  return out;
+}
+
+// Bookmarklet capture time: strict ISO UTC string; returns a Date or throws (feeds the capture date and history ID).
+export function parseCapturedAt(s) {
+  const ok = typeof s === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$/.test(s);
+  const d = ok ? new Date(s) : null;
+  if (!d || Number.isNaN(d.getTime()) || d.toISOString().slice(0, 19) !== s.slice(0, 19)) {
+    throw new Error('JSON 缺少有效的擷取時間 captured_at');
+  }
+  return d;
+}
+
 function dayNumber(ymd) {
   const [y, m, d] = ymd.split('-').map(Number);
   return Math.round(Date.UTC(y, m - 1, d) / 86400000);

@@ -1,11 +1,11 @@
 // Admin page: password unlocks the encrypted token, edit weeks, save via GitHub Contents API.
 import {
   WEEK_OPTIONS, weekStyle, validateData, formatTaipei, formatLastUpdate, decryptToken,
-  parseRisText, computeActual, actualStyle, completionRate, formatRate, taipeiDateString, buildNextData,
+  parseRisText, parseRisJson, parseCapturedAt, computeActual, actualStyle, completionRate, formatRate, taipeiDateString, buildNextData,
   taipeiDateTimeString, historyColumns, buildHistoryRow, upsertHistory,
   expectedColumns, buildExpectedRow, appendCsvRow,
-} from './core.js?v=20261116c';
-import { getFile, putFile, getText, putText } from './github.js?v=20261116c';
+} from './core.js?v=20261118a';
+import { getFile, putFile, getText, putText } from './github.js?v=20261118a';
 
 const $ = (id) => document.getElementById(id);
 const HISTORY_PATH = 'history.csv';
@@ -126,12 +126,21 @@ async function onRisFile() {
     const text = await file.text();
     if (gen !== risGen) return; // a newer selection superseded this one
     const stats = {};
-    const records = parseRisText(text, stats);
+    let records; let when = new Date(file.lastModified);
+    if (text.trimStart().startsWith('{')) {
+      // Bookmarklet JSON: its own capture timestamp is more accurate than the file's mtime.
+      let obj;
+      try { obj = JSON.parse(text); } catch { throw new Error('JSON 無法解析，請確認檔案完整'); }
+      records = parseRisJson(obj, stats);
+      when = parseCapturedAt(obj.captured_at);
+    } else {
+      records = parseRisText(text, stats);
+    }
     if (records.length === 0) { setMsg('ris-msg', '讀不到任何有效紀錄，請確認檔案格式', 'err'); return; }
-    $('ris-date').value = taipeiDateString(new Date(file.lastModified));
+    $('ris-date').value = taipeiDateString(when);
     ris = {
       records, result: null, captureDate: $('ris-date').value, skipped: stats.skipped,
-      fileTime: taipeiDateTimeString(new Date(file.lastModified)),
+      fileTime: taipeiDateTimeString(when),
     };
     setMsg('ris-msg', '已解析（尚未儲存，按下方「儲存」才會發佈）', 'ok');
     renderRis();

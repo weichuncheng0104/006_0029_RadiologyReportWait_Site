@@ -493,3 +493,94 @@ test('buildNextData without ris keeps previous completionRate and exam range', (
   assert.deepEqual(n.items, [{ id: 'ct', name: 'CT', weeks: 2, actualDays: 13, completionRate: 94.9 }]);
   assert.equal(validateData(n).ok, true);
 });
+
+// ---- Bookmarklet JSON (mjb3w001-list/1); fabricated rows only ----
+import { parseRisJson } from '../core.js';
+
+const JSON_COLUMNS = ['seq', 'report_index', '檢查日', '病歷號', '會診單號', '姓名', '性別', '年齡', '狀態', '音', '診別', '科別', '檢查地', '檢查項目', '報告醫師', '改派者'];
+const FIXTURE = [
+  ['2026/10/01', '檢查畢 尚未處理', ['CHEST PA', 'SPINE L-S AP']],
+  ['2026/10/02', '檢查畢 已發送', ['腹部超音波', 'CT BRAIN']],
+  ['2026/10/03', '檢查畢 編輯中', ['MRI L-SPINE']],
+  ['2026/10/04', '尚未處理', ['CHEST PA']],
+  ['2026/10/05', '檢查畢 尚未處理', []],
+  ['bad-date', '檢查畢 已發送', ['CHEST PA']],
+];
+function jsonRow(i, [date, status, items]) {
+  const r = Array(16).fill('x');
+  r[0] = String(i + 1); r[1] = i; r[2] = `${date} 08:30:00`; r[8] = status; r[13] = items.join('\n');
+  return r;
+}
+function bookmarkJson(over = {}) {
+  const rows = FIXTURE.map((f, i) => jsonRow(i, f));
+  return {
+    schema: 'mjb3w001-list/1', captured_at: '2026-10-08T00:42:10.840Z', captured_at_local: '2026-10-08 08:42:10',
+    route: '/WEBRIS/MJB/MJB3W001.do', query: {}, columns: JSON_COLUMNS,
+    reported_total: rows.length, harvested: rows.length, rows, warnings: [], ...over,
+  };
+}
+
+test('parseRisJson yields the same stats as the equivalent txt', () => {
+  const text = FIXTURE.map(([d, s, items], i) => rec(i + 1, d, s, items)).join('\r\n') + '\r\n';
+  const sj = {}; const st = {};
+  const fromJson = parseRisJson(bookmarkJson(), sj);
+  const fromTxt = parseRisText(text, st);
+  assert.deepEqual(fromJson, fromTxt);
+  assert.equal(sj.skipped, 1);
+  assert.equal(st.skipped, 1);
+  const ids = ['xray', 'ct', 'mri', 'abd_us'];
+  assert.deepEqual(computeActual(fromJson, '2026-10-08', ids), computeActual(fromTxt, '2026-10-08', ids));
+});
+
+test('parseRisJson locates columns by name, not position', () => {
+  const obj = bookmarkJson();
+  const order = [...JSON_COLUMNS.keys()].reverse();
+  obj.columns = order.map((k) => JSON_COLUMNS[k]);
+  obj.rows = obj.rows.map((r) => order.map((k) => r[k]));
+  assert.deepEqual(parseRisJson(obj), parseRisJson(bookmarkJson()));
+});
+
+test('parseRisJson rejects files that could silently skew the stats', () => {
+  const bad = [
+    [{ schema: 'nhi-harvest/2' }, /不支援/],
+    [{ harvested: 5 }, /筆數/],
+    [{ reported_total: 7, harvested: 7 }, /筆數/],
+    [{ warnings: ['x'] }, /警告/],
+    [{ warnings: undefined }, /警告/],
+    [{ columns: JSON_COLUMNS.map((c) => (c === '狀態' ? 'status' : c)) }, /缺少/],
+  ];
+  for (const [over, re] of bad) assert.throws(() => parseRisJson(bookmarkJson(over)), re);
+  assert.throws(() => parseRisJson(null), /不支援/);
+  const unknown = bookmarkJson();
+  unknown.rows[0][8] = '檢查畢 已作廢';
+  assert.throws(() => parseRisJson(unknown), /未知狀態/);
+  const noPrefix = bookmarkJson();
+  for (const r of noPrefix.rows) r[8] = r[8].replace('檢查畢 ', '');
+  assert.throws(() => parseRisJson(noPrefix), /檢查畢/);
+});
+
+test('parseRisJson rejects non-array rows and any missing key column', () => {
+  const obj = bookmarkJson(); obj.rows[0] = 5;
+  assert.throws(() => parseRisJson(obj), /列格式/);
+  for (const name of ['檢查日', '狀態', '檢查項目']) {
+    assert.throws(() => parseRisJson(bookmarkJson({ columns: JSON_COLUMNS.map((c) => (c === name ? 'zz' : c)) })), /缺少/);
+  }
+});
+
+test('parseRisJson rejects truncated rows and non-string key cells', () => {
+  const short = bookmarkJson(); short.rows[0] = short.rows[0].slice(0, 13);
+  assert.throws(() => parseRisJson(short), /列格式/);
+  const nullItems = bookmarkJson(); nullItems.rows[0][13] = null;
+  assert.throws(() => parseRisJson(nullItems), /列格式/);
+  const emptyItems = bookmarkJson(); emptyItems.rows[0][13] = ''; // legitimate: list rows with no item
+  assert.deepEqual(parseRisJson(emptyItems)[0].items, []);
+});
+
+import { parseCapturedAt } from '../core.js';
+test('parseCapturedAt accepts strict ISO UTC only', () => {
+  assert.equal(parseCapturedAt('2026-11-18T00:42:10.840Z').toISOString(), '2026-11-18T00:42:10.840Z');
+  assert.equal(taipeiDateString(parseCapturedAt('2026-10-07T16:30:00Z')), '2026-10-08');
+  for (const bad of [null, undefined, 0, 1731890530000, '', '2026-11-18 08:42:10', '2026-11-18T08:42:10', '2026-02-30T00:00:00Z', 'x']) {
+    assert.throws(() => parseCapturedAt(bad), /captured_at/, String(bad));
+  }
+});
