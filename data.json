@@ -1,5 +1,5 @@
 {
-  "lastUpdate": "2026-11-18T01:10:30.789Z",
+  "lastUpdate": "2026-11-18T02:23:19.100Z",
   "items": [
     {
       "id": "xray",
@@ -18,7 +18,7 @@
     {
       "id": "mri",
       "name": "MRI",
-      "weeks": 2,
+      "weeks": 4,
       "actualDays": 33,
       "completionRate": 83.1
     },
