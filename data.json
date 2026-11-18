@@ -4,7 +4,7 @@
     {
       "id": "xray",
       "name": "X 光",
-      "weeks": 4,
+      "weeks": 5,
       "actualDays": 42,
       "completionRate": 46.7
     },
@@ -39,7 +39,7 @@
     {
       "id": "abd_us",
       "name": "腹部超音波",
-      "weeks": 4,
+      "weeks": 5,
       "actualDays": 29,
       "completionRate": 92.7
     },

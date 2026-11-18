@@ -14,7 +14,8 @@ export const WEEK_OPTIONS = [
   { value: 1, ...WAIT_PALETTE.week1 },
   { value: 2, ...WAIT_PALETTE.week2 },
   { value: 3, ...WAIT_PALETTE.week3 },
-  { value: 4, ...WAIT_PALETTE.week4plus },
+  { value: 4, ...WAIT_PALETTE.week4 },
+  { value: 5, ...WAIT_PALETTE.week4plus },
 ];
 
 // Legend entries for the board; the grey "no pending" entry only when actual data is shown.
@@ -376,12 +377,12 @@ export function upsertHistory(csvText, row, columns) {
 export const EXPECTED_ID_COL = '存檔時間';
 
 export function expectedColumns(items) {
-  return [EXPECTED_ID_COL, ...items.map((it) => `${it.name}_預計週數(4=四週以上)`)];
+  return [EXPECTED_ID_COL, ...items.map((it) => `${it.name}_預計週數(5=四週以上)`)];
 }
 
 export function buildExpectedRow(savedAt, items) {
   const row = { [EXPECTED_ID_COL]: savedAt };
-  for (const it of items) row[`${it.name}_預計週數(4=四週以上)`] = String(it.weeks);
+  for (const it of items) row[`${it.name}_預計週數(5=四週以上)`] = String(it.weeks);
   return row;
 }
 

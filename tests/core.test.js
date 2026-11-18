@@ -7,13 +7,15 @@ import {
 } from '../core.js';
 
 test('weekStyle maps weeks to label and colors', () => {
-  assert.equal(WEEK_OPTIONS.length, 4);
+  assert.equal(WEEK_OPTIONS.length, 5);
   assert.equal(weekStyle(1).bg, '#1e7b34');
   assert.equal(weekStyle(1).label, '一週');
   assert.equal(weekStyle(2).bg, '#a6dba0');
   assert.equal(weekStyle(3).bg, '#ffd84d');
-  assert.equal(weekStyle(4).bg, '#d64545');
-  assert.equal(weekStyle(4).label, '四週以上');
+  assert.equal(weekStyle(4).bg, '#f08c3a');
+  assert.equal(weekStyle(4).label, '四週');
+  assert.equal(weekStyle(5).bg, '#d64545');
+  assert.equal(weekStyle(5).label, '四週以上');
 });
 
 test('weekStyle returns gray placeholder for invalid values', () => {
@@ -337,7 +339,8 @@ test('estimated and actual columns share colours per label', () => {
   same(weekStyle(1), actualStyle2(5));
   same(weekStyle(2), actualStyle2(14));
   same(weekStyle(3), actualStyle2(21));
-  same(weekStyle(4), actualStyle2(29));
+  same(weekStyle(4), actualStyle2(28));
+  same(weekStyle(5), actualStyle2(29));
   assert.equal(actualStyle2(28).label, '四週');
   assert.equal(actualStyle2(28).bg, WAIT_PALETTE.week4.bg);
 });
@@ -360,14 +363,14 @@ const eItems = [
 ];
 
 test('expectedColumns: ID first, then one column per item in order', () => {
-  assert.deepEqual(expectedColumns(eItems), ['存檔時間', 'X光_預計週數(4=四週以上)', '電腦斷層_預計週數(4=四週以上)']);
+  assert.deepEqual(expectedColumns(eItems), ['存檔時間', 'X光_預計週數(5=四週以上)', '電腦斷層_預計週數(5=四週以上)']);
 });
 
 test('buildExpectedRow: numeric weeks from item.weeks', () => {
   const row = buildExpectedRow('2026-11-14 09:00:00', eItems);
   assert.equal(row['存檔時間'], '2026-11-14 09:00:00');
-  assert.equal(row['X光_預計週數(4=四週以上)'], '1');
-  assert.equal(row['電腦斷層_預計週數(4=四週以上)'], '4');
+  assert.equal(row['X光_預計週數(5=四週以上)'], '1');
+  assert.equal(row['電腦斷層_預計週數(5=四週以上)'], '4');
 });
 
 test('appendCsvRow: same timestamp twice gives two rows, order kept, no upsert', () => {
@@ -383,7 +386,7 @@ test('appendCsvRow: same timestamp twice gives two rows, order kept, no upsert',
 
 test('appendCsvRow keeps legacy-only columns last with old values, tolerates BOM/LF', () => {
   const cols = expectedColumns(eItems);
-  const old = '﻿存檔時間,舊欄,X光_預計週數(4=四週以上)\n2026-11-01 08:00:00,keep,2\n';
+  const old = '﻿存檔時間,舊欄,X光_預計週數(5=四週以上)\n2026-11-01 08:00:00,keep,2\n';
   const rows = csvParse(appendCsvRow(old, buildExpectedRow('2026-11-14 09:00:00', eItems), cols));
   assert.deepEqual(rows[0], [...cols, '舊欄']);
   assert.deepEqual(rows[1], ['2026-11-01 08:00:00', '2', '', 'keep']);
