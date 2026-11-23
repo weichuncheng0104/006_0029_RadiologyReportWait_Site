@@ -7,7 +7,8 @@
 
 - 週數資料在 `data.json`；後台儲存時經 GitHub API 寫回此檔。
 - 寫入用的 GitHub fine-grained token（僅限本 repo、Contents 讀寫）以後台密碼加密後存於 `token.enc.json`（PBKDF2-SHA256 600,000 次 → AES-GCM）。輸入正確密碼才能在瀏覽器中解開；解開的 token 只留在該頁記憶體，重新整理即清除。
-- 換 token 或換密碼：由管理端重新產生 `token.enc.json` 後推上本 repo。舊 token 請至 GitHub → Settings → Developer settings → Fine-grained tokens 刪除。
+- 後台登入後可開「書籤安裝頁」（MJB3W001 清單打包書籤與操作說明），內容以同一組密碼加密存於 `bookmarklet.enc.json`。
+- 換 token 或換密碼：由管理端重新產生 `token.enc.json`（換密碼時連同 `bookmarklet.enc.json`）後推上本 repo。舊 token 請至 GitHub → Settings → Developer settings → Fine-grained tokens 刪除。
 
 ## 其他
 

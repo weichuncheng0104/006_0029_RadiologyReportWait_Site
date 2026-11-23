@@ -4,8 +4,8 @@ import {
   parseRisText, parseRisJson, parseCapturedAt, computeActual, actualStyle, completionRate, formatRate, taipeiDateString, buildNextData,
   taipeiDateTimeString, historyColumns, buildHistoryRow, upsertHistory,
   expectedColumns, buildExpectedRow, appendCsvRow,
-} from './core.js?v=20261118b';
-import { getFile, putFile, getText, putText } from './github.js?v=20261118b';
+} from './core.js?v=20261123a';
+import { getFile, putFile, getText, putText } from './github.js?v=20261123a';
 
 const $ = (id) => document.getElementById(id);
 const HISTORY_PATH = 'history.csv';
@@ -259,6 +259,25 @@ async function downloadCsv(btnId, path, filename, emptyMsg) {
   }
 }
 
+// Decrypt the bookmarklet install page (same admin password) and expose it as a Blob URL link.
+// Runs in the background after login; a failure only affects this panel.
+let bmUrl = null;
+async function prepareBookmarklet(pw) {
+  if (bmUrl) return;
+  setMsg('bm-msg', '準備中…');
+  try {
+    const res = await fetch(`./bookmarklet.enc.json?t=${Date.now()}`, { cache: 'no-store' });
+    if (!res.ok) throw new Error();
+    const html = await decryptToken(await res.json(), pw);
+    bmUrl = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }));
+    $('bm-link').href = bmUrl;
+    $('bm-link').hidden = false;
+    setMsg('bm-msg', '');
+  } catch {
+    setMsg('bm-msg', '無法載入書籤安裝頁，請聯絡管理者', 'err');
+  }
+}
+
 async function login() {
   $('login-btn').disabled = true;
   setMsg('login-msg', '驗證中…');
@@ -278,6 +297,7 @@ async function login() {
       setMsg('login-msg', '密碼錯誤', 'err');
       return;
     }
+    prepareBookmarklet($('pw').value);
     $('pw').value = '';
     setMsg('login-msg', '');
     await loadData();
