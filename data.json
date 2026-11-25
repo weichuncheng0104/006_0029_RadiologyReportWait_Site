@@ -1,88 +1,88 @@
 {
-  "lastUpdate": "2026-11-24T00:05:33.927Z",
+  "lastUpdate": "2026-11-25T00:45:11.398Z",
   "items": [
     {
       "id": "xray",
       "name": "X 光",
       "weeks": 5,
-      "actualDays": 42,
-      "completionRate": 47.5
+      "actualDays": 85,
+      "completionRate": 47
     },
     {
       "id": "ct",
       "name": "CT",
       "weeks": 2,
-      "actualDays": 7,
-      "completionRate": 96.2
+      "actualDays": 8,
+      "completionRate": 97.5
     },
     {
       "id": "mri",
       "name": "MRI",
       "weeks": 2,
-      "actualDays": 21,
-      "completionRate": 82.8
+      "actualDays": 22,
+      "completionRate": 91.6
     },
     {
       "id": "mammo",
       "name": "乳房攝影",
       "weeks": 2,
-      "actualDays": 19,
-      "completionRate": 89.5
+      "actualDays": 9,
+      "completionRate": 95.9
     },
     {
       "id": "bmd",
       "name": "骨密度",
       "weeks": 2,
-      "actualDays": 13,
-      "completionRate": 87.9
+      "actualDays": null,
+      "completionRate": 100
     },
     {
       "id": "abd_us",
       "name": "腹部超音波",
       "weeks": 2,
-      "actualDays": 12,
-      "completionRate": 97.2
+      "actualDays": 8,
+      "completionRate": 98.2
     },
     {
       "id": "breast_us",
       "name": "乳房超音波",
       "weeks": 2,
-      "actualDays": 41,
-      "completionRate": 78
+      "actualDays": 84,
+      "completionRate": 85.7
     },
     {
       "id": "thyroid_us",
       "name": "甲狀腺／頸部超音波",
       "weeks": 2,
-      "actualDays": 36,
-      "completionRate": 93.7
+      "actualDays": 79,
+      "completionRate": 92.4
     },
     {
       "id": "carotid_us",
       "name": "頸動脈超音波",
       "weeks": 2,
-      "actualDays": 42,
-      "completionRate": 52.2
+      "actualDays": 85,
+      "completionRate": 53.2
     },
     {
       "id": "vascular_us",
       "name": "四肢血管超音波",
       "weeks": 2,
-      "actualDays": 42,
-      "completionRate": 4.2
+      "actualDays": 85,
+      "completionRate": 4.3
     },
     {
       "id": "other_us",
       "name": "其他超音波",
       "weeks": 2,
-      "actualDays": 42,
-      "completionRate": 21.8
+      "actualDays": 85,
+      "completionRate": 22.8
     }
   ],
   "actual": {
-    "captureDate": "2026-11-24",
-    "uploadedAt": "2026-11-24T00:05:33.927Z",
-    "examStart": "2026-10-13",
-    "examEnd": "2026-11-24"
+    "captureDate": "2026-11-25",
+    "uploadedAt": "2026-11-25T00:45:11.398Z",
+    "examStart": "2026-09-01",
+    "examEnd": "2026-11-25"
   }
 }
